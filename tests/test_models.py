@@ -25,15 +25,49 @@ def test_dynamic_stratify_numeric():
     assert result['stratum'].nunique() == 3
     assert len(result) == n
 
-def test_dynamic_stratify_categorical_raises():
-    """Test that categorical auxiliary variables raise TypeError."""
+def test_dynamic_stratify_with_categorical_aux():
+    """Test dynamic stratification with categorical auxiliary variables."""
     n = 50
     data = pd.DataFrame({
         'basal_area': np.random.randn(n),
-        'development_stage_class': np.random.choice(['young', 'mature', 'old'], n)
+        'development_stage_class': np.random.choice(['young', 'mature', 'old'], n),
+        'species_mix': np.random.choice(['pine', 'spruce', 'fir'], n)
     })
     target_vars = ['basal_area']
-    aux_vars = ['development_stage_class']
+    aux_vars = ['development_stage_class', 'species_mix']
     
-    with pytest.raises(TypeError, match="must be numeric"):
-        dynamic_stratify(data, target_vars, aux_vars)
+    # Should not raise TypeError
+    result = dynamic_stratify(data, target_vars, aux_vars, n_strata=2)
+    
+    assert isinstance(result, pd.DataFrame)
+    assert 'stratum' in result.columns
+    assert result['stratum'].nunique() == 2
+    assert len(result) == n
+    # Ensure original columns unchanged
+    assert 'development_stage_class' in result.columns
+    assert 'species_mix' in result.columns
+
+def test_dynamic_stratify_mixed_numeric_categorical():
+    """Test with both numeric and categorical auxiliary variables."""
+    n = 80
+    data = pd.DataFrame({
+        'basal_area': np.random.randn(n),
+        'mean_height': np.random.randn(n),
+        'pc1': np.random.randn(n),
+        'development_stage_class': np.random.choice(['young', 'mature', 'old'], n)
+    })
+    target_vars = ['basal_area', 'mean_height']
+    aux_vars = ['pc1', 'development_stage_class']
+    
+    result = dynamic_stratify(data, target_vars, aux_vars, n_strata=4)
+    
+    assert isinstance(result, pd.DataFrame)
+    assert 'stratum' in result.columns
+    assert result['stratum'].nunique() == 4
+    assert len(result) == n
+
+def test_dynamic_stratify_no_aux_vars():
+    """Test error when no auxiliary variables provided."""
+    data = pd.DataFrame({'basal_area': [1, 2, 3]})
+    with pytest.raises(ValueError, match="No valid auxiliary variables"):
+        dynamic_stratify(data, ['basal_area'], [])
